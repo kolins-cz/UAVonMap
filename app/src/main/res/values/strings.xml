@@ -1,6 +1,22 @@
 <resources>
     <string name="app_name">UAVonMap</string>
     <string name="action_settings">Settings</string>
+
+    <!-- Connection protocols -->
+    <string name="protocol_label">Connection Protocol</string>
+    <string name="protocol_tcp">TCP</string>
+    <string name="protocol_udp">UDP</string>
+    <string name="protocol_bluetooth_spp">Bluetooth SPP (Coming soon)</string>
+    <string name="protocol_ble">Bluetooth LE (Coming soon)</string>
+    <string name="protocol_usb_serial">USB Serial (Coming soon)</string>
+    
+    <string-array name="connection_protocols">
+        <item>@string/protocol_tcp</item>
+        <item>@string/protocol_udp</item>
+        <item>@string/protocol_bluetooth_spp</item>
+        <item>@string/protocol_ble</item>
+        <item>@string/protocol_usb_serial</item>
+    </string-array>
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">First Fragment</string>
     <string name="second_fragment_label">Second Fragment</string>

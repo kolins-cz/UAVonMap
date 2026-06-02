@@ -18,13 +18,14 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.divpundir.mavlink.adapters.coroutines.asCoroutine
 import com.divpundir.mavlink.api.MavEnumValue
-import com.divpundir.mavlink.connection.tcp.TcpClientMavConnection
-import com.divpundir.mavlink.definitions.ardupilotmega.ArdupilotmegaDialect
 import com.divpundir.mavlink.definitions.common.MavDataStream
 import com.divpundir.mavlink.definitions.common.RequestDataStream
 import dev.uavonmap.app.MainActivity
+import dev.uavonmap.app.connection.ConnectionProtocol
+import dev.uavonmap.app.connection.MavConnection
+import dev.uavonmap.app.connection.TcpMavConnectionAdapter
+import dev.uavonmap.app.connection.UdpMavConnectionAdapter
 import dev.uavonmap.app.parser.MavlinkParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,7 @@ class MockLocationService : Service() {
     companion object {
         const val EXTRA_HOST       = "host"
         const val EXTRA_PORT       = "port"
+        const val EXTRA_PROTOCOL   = "protocol"
         private const val CHANNEL_ID      = "mock_location_channel"
         private const val NOTIFICATION_ID = 1
         private const val PROVIDER        = LocationManager.GPS_PROVIDER
@@ -66,9 +68,11 @@ class MockLocationService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val host = intent?.getStringExtra(EXTRA_HOST) ?: return START_NOT_STICKY
         val port = intent.getIntExtra(EXTRA_PORT, 14550)
+        val protocolOrdinal = intent.getIntExtra(EXTRA_PROTOCOL, ConnectionProtocol.TCP.ordinal)
+        val protocol = ConnectionProtocol.fromOrdinal(protocolOrdinal)
         startForeground(NOTIFICATION_ID, buildNotification("Connecting to $host:$port…"))
         addMockProvider()
-        startStreaming(host, port)
+        startStreaming(host, port, protocol)
         return START_STICKY
     }
 
@@ -80,17 +84,33 @@ class MockLocationService : Service() {
         removeMockProvider()
     }
 
-    private fun startStreaming(host: String, port: Int) {
+    private fun startStreaming(host: String, port: Int, protocol: ConnectionProtocol) {
         connectionJob?.cancel()
-        val mavConn = TcpClientMavConnection(host, port, ArdupilotmegaDialect).asCoroutine()
+        
+        // Create the appropriate connection based on protocol
+        val mavConn: MavConnection = when (protocol) {
+            ConnectionProtocol.TCP -> TcpMavConnectionAdapter(host, port)
+            ConnectionProtocol.UDP -> UdpMavConnectionAdapter(port)
+            ConnectionProtocol.BLUETOOTH_SPP,
+            ConnectionProtocol.BLE,
+            ConnectionProtocol.USB_SERIAL -> {
+                updateStatus("Error: ${protocol.displayName} not implemented")
+                return
+            }
+        }
+        
         connectionJob = scope.launch {
-            updateStatus("Connecting to $host:$port…")
+            val endpoint = when (protocol) {
+                ConnectionProtocol.UDP -> "UDP port $port"
+                else -> "$host:$port"
+            }
+            updateStatus("Connecting to $endpoint (${protocol.displayName})…")
             try {
                 mavConn.connect(readerScope = this)
-                Log.d(TAG, "Connected to $host:$port")
-                updateStatus("Connected — requesting GPS stream…")
+                Log.d(TAG, "Connected via ${protocol.displayName}")
+                updateStatus("Connected (${protocol.displayName}) — requesting GPS stream…")
                 requestDataStreams(mavConn)
-                updateStatus("Connected — waiting for GPS fix…")
+                updateStatus("Connected (${protocol.displayName}) — waiting for GPS fix…")
                 MavlinkParser.fromFrameFlow(mavConn.mavFrame).collect { gps ->
                     pushLocation(gps.latitude, gps.longitude, gps.altitude,
                         gps.speed, gps.bearing, gps.hdop)
@@ -107,7 +127,7 @@ class MockLocationService : Service() {
         }
     }
 
-    private suspend fun requestDataStreams(mavConn: com.divpundir.mavlink.adapters.coroutines.CoroutinesMavConnection) {
+    private suspend fun requestDataStreams(mavConn: MavConnection) {
         val streams = listOf(
             MavDataStream.ALL,
             MavDataStream.POSITION,
