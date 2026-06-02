@@ -27,6 +27,7 @@ import dev.uavonmap.app.connection.RawConnection
 import dev.uavonmap.app.connection.TcpRawConnection
 import dev.uavonmap.app.connection.TelemetryProtocol
 import dev.uavonmap.app.connection.UdpRawConnection
+import dev.uavonmap.app.parser.CrsfGpsParser
 import dev.uavonmap.app.parser.MavlinkGpsParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,6 +119,15 @@ class MockLocationService : Service() {
                         launch { requestMavlinkDataStreams(conn) }
                         updateStatus("Connected — waiting for GPS fix…")
                         MavlinkGpsParser().parseGps(conn).collect { gps ->
+                            pushLocation(gps.latitude, gps.longitude, gps.altitude,
+                                gps.speed, gps.bearing, gps.hdop)
+                            updateStatus("Fix: %.6f, %.6f  alt=%.1fm".format(
+                                gps.latitude, gps.longitude, gps.altitude))
+                        }
+                    }
+                    TelemetryProtocol.CRSF -> {
+                        updateStatus("Connected — waiting for CRSF GPS fix…")
+                        CrsfGpsParser().parseGps(conn).collect { gps ->
                             pushLocation(gps.latitude, gps.longitude, gps.altitude,
                                 gps.speed, gps.bearing, gps.hdop)
                             updateStatus("Fix: %.6f, %.6f  alt=%.1fm".format(

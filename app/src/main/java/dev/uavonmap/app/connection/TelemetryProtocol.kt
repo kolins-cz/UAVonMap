@@ -7,7 +7,7 @@ package dev.uavonmap.app.connection
 enum class TelemetryProtocol(val displayName: String, val isImplemented: Boolean) {
     AUTO("Auto-detect",  isImplemented = false),
     MAVLINK2("MAVLink 2", isImplemented = true),
-    CRSF("CRSF",         isImplemented = false),
+    CRSF("CRSF",         isImplemented = true),
     MSP("MSP",           isImplemented = false),
     LTM("LTM",           isImplemented = false),
     NMEA("NMEA 0183",    isImplemented = false),
