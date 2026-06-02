@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.mavlink.definitions)
     implementation(libs.mavlink.connection.tcp)
+    implementation(libs.mavlink.connection.udp)
     implementation(libs.mavlink.coroutines)
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.lifecycle.runtime.ktx)

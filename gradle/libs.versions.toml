@@ -26,6 +26,7 @@ lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-view
 lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 mavlink-definitions    = { group = "com.divpundir.mavlink", name = "definitions",        version.ref = "mavlinkKotlin" }
 mavlink-connection-tcp = { group = "com.divpundir.mavlink", name = "connection-tcp",     version.ref = "mavlinkKotlin" }
+mavlink-connection-udp = { group = "com.divpundir.mavlink", name = "connection-udp",     version.ref = "mavlinkKotlin" }
 mavlink-coroutines     = { group = "com.divpundir.mavlink", name = "adapter-coroutines", version.ref = "mavlinkKotlin" }
 
 [plugins]
