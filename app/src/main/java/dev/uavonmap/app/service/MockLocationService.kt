@@ -23,10 +23,11 @@ import com.divpundir.mavlink.definitions.common.MavDataStream
 import com.divpundir.mavlink.definitions.common.RequestDataStream
 import dev.uavonmap.app.MainActivity
 import dev.uavonmap.app.connection.ConnectionProtocol
-import dev.uavonmap.app.connection.MavConnection
-import dev.uavonmap.app.connection.TcpMavConnectionAdapter
-import dev.uavonmap.app.connection.UdpMavConnectionAdapter
-import dev.uavonmap.app.parser.MavlinkParser
+import dev.uavonmap.app.connection.RawConnection
+import dev.uavonmap.app.connection.TcpRawConnection
+import dev.uavonmap.app.connection.TelemetryProtocol
+import dev.uavonmap.app.connection.UdpRawConnection
+import dev.uavonmap.app.parser.MavlinkGpsParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,9 +37,10 @@ import kotlinx.coroutines.launch
 class MockLocationService : Service() {
 
     companion object {
-        const val EXTRA_HOST       = "host"
-        const val EXTRA_PORT       = "port"
-        const val EXTRA_PROTOCOL   = "protocol"
+        const val EXTRA_HOST           = "host"
+        const val EXTRA_PORT           = "port"
+        const val EXTRA_PROTOCOL       = "protocol"
+        const val EXTRA_TELEM_PROTOCOL = "telem_protocol"
         private const val CHANNEL_ID      = "mock_location_channel"
         private const val NOTIFICATION_ID = 1
         private const val PROVIDER        = LocationManager.GPS_PROVIDER
@@ -70,9 +72,11 @@ class MockLocationService : Service() {
         val port = intent.getIntExtra(EXTRA_PORT, 14550)
         val protocolOrdinal = intent.getIntExtra(EXTRA_PROTOCOL, ConnectionProtocol.TCP.ordinal)
         val protocol = ConnectionProtocol.fromOrdinal(protocolOrdinal)
-        startForeground(NOTIFICATION_ID, buildNotification("Connecting to $host:$port…"))
+        val telemOrdinal = intent.getIntExtra(EXTRA_TELEM_PROTOCOL, TelemetryProtocol.MAVLINK2.ordinal)
+        val telemetry = TelemetryProtocol.fromOrdinal(telemOrdinal)
+        startForeground(NOTIFICATION_ID, buildNotification("Connecting…"))
         addMockProvider()
-        startStreaming(host, port, protocol)
+        startStreaming(host, port, protocol, telemetry)
         return START_STICKY
     }
 
@@ -84,50 +88,55 @@ class MockLocationService : Service() {
         removeMockProvider()
     }
 
-    private fun startStreaming(host: String, port: Int, protocol: ConnectionProtocol) {
+    private fun startStreaming(host: String, port: Int, transport: ConnectionProtocol, telemetry: TelemetryProtocol) {
         connectionJob?.cancel()
-        
-        // Create the appropriate connection based on protocol
-        val mavConn: MavConnection = when (protocol) {
-            ConnectionProtocol.TCP -> TcpMavConnectionAdapter(host, port)
-            ConnectionProtocol.UDP -> UdpMavConnectionAdapter(port)
+
+        val conn: RawConnection = when (transport) {
+            ConnectionProtocol.TCP -> TcpRawConnection(host, port)
+            ConnectionProtocol.UDP -> UdpRawConnection(port)
             ConnectionProtocol.BLUETOOTH_SPP,
             ConnectionProtocol.BLE,
             ConnectionProtocol.USB_SERIAL -> {
-                updateStatus("Error: ${protocol.displayName} not implemented")
+                updateStatus("Error: ${transport.displayName} transport not implemented")
                 return
             }
         }
-        
+
         connectionJob = scope.launch {
-            val endpoint = when (protocol) {
-                ConnectionProtocol.UDP -> "UDP port $port"
+            val endpoint = when (transport) {
+                ConnectionProtocol.UDP -> "UDP :$port"
                 else -> "$host:$port"
             }
-            updateStatus("Connecting to $endpoint (${protocol.displayName})…")
+            updateStatus("Connecting to $endpoint via ${telemetry.displayName}…")
             try {
-                mavConn.connect(readerScope = this)
-                Log.d(TAG, "Connected via ${protocol.displayName}")
-                updateStatus("Connected (${protocol.displayName}) — requesting GPS stream…")
-                requestDataStreams(mavConn)
-                updateStatus("Connected (${protocol.displayName}) — waiting for GPS fix…")
-                MavlinkParser.fromFrameFlow(mavConn.mavFrame).collect { gps ->
-                    pushLocation(gps.latitude, gps.longitude, gps.altitude,
-                        gps.speed, gps.bearing, gps.hdop)
-                    updateStatus("Fix: %.6f, %.6f  alt=%.1fm".format(
-                        gps.latitude, gps.longitude, gps.altitude))
+                conn.connect(readerScope = this)
+                Log.d(TAG, "Transport connected: ${transport.displayName}")
+
+                when (telemetry) {
+                    TelemetryProtocol.MAVLINK2 -> {
+                        updateStatus("Connected — requesting MAVLink streams…")
+                        launch { requestMavlinkDataStreams(conn) }
+                        updateStatus("Connected — waiting for GPS fix…")
+                        MavlinkGpsParser().parseGps(conn).collect { gps ->
+                            pushLocation(gps.latitude, gps.longitude, gps.altitude,
+                                gps.speed, gps.bearing, gps.hdop)
+                            updateStatus("Fix: %.6f, %.6f  alt=%.1fm".format(
+                                gps.latitude, gps.longitude, gps.altitude))
+                        }
+                    }
+                    else -> updateStatus("Error: ${telemetry.displayName} parser not yet implemented")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Connection error: ${e.message}", e)
                 updateStatus("Error: ${e.message}")
             } finally {
-                runCatching { mavConn.close() }
+                runCatching { conn.close() }
                 updateStatus("Disconnected")
             }
         }
     }
 
-    private suspend fun requestDataStreams(mavConn: MavConnection) {
+    private suspend fun requestMavlinkDataStreams(conn: RawConnection) {
         val streams = listOf(
             MavDataStream.ALL,
             MavDataStream.POSITION,
@@ -136,7 +145,8 @@ class MockLocationService : Service() {
         )
         for (stream in streams) {
             runCatching {
-                mavConn.sendV1(
+                MavlinkGpsParser.sendV1(
+                    transport   = conn,
                     systemId    = 255u,
                     componentId = 190u,
                     payload = RequestDataStream(

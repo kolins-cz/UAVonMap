@@ -2,8 +2,8 @@
     <string name="app_name">UAVonMap</string>
     <string name="action_settings">Settings</string>
 
-    <!-- Connection protocols -->
-    <string name="protocol_label">Connection Protocol</string>
+    <!-- Connection protocols (transport) -->
+    <string name="protocol_label">Transport</string>
     <string name="protocol_tcp">TCP</string>
     <string name="protocol_udp">UDP</string>
     <string name="protocol_bluetooth_spp">Bluetooth SPP (Coming soon)</string>
@@ -16,6 +16,26 @@
         <item>@string/protocol_bluetooth_spp</item>
         <item>@string/protocol_ble</item>
         <item>@string/protocol_usb_serial</item>
+    </string-array>
+
+    <!-- Telemetry protocols (wire format) -->
+    <string name="telem_protocol_label">Telemetry Protocol</string>
+    <string name="telem_auto">Auto-detect (Coming soon)</string>
+    <string name="telem_mavlink2">MAVLink 2</string>
+    <string name="telem_crsf">CRSF (Coming soon)</string>
+    <string name="telem_msp">MSP (Coming soon)</string>
+    <string name="telem_ltm">LTM (Coming soon)</string>
+    <string name="telem_nmea">NMEA 0183 (Coming soon)</string>
+    <string name="telem_ublox">u-blox UBX (Coming soon)</string>
+
+    <string-array name="telemetry_protocols">
+        <item>@string/telem_auto</item>
+        <item>@string/telem_mavlink2</item>
+        <item>@string/telem_crsf</item>
+        <item>@string/telem_msp</item>
+        <item>@string/telem_ltm</item>
+        <item>@string/telem_nmea</item>
+        <item>@string/telem_ublox</item>
     </string-array>
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">First Fragment</string>

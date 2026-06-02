@@ -1,7 +1,5 @@
 package dev.uavonmap.app.connection
 
-import com.divpundir.mavlink.api.MavFrame
-import com.divpundir.mavlink.api.MavMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,10 +28,10 @@ import kotlinx.coroutines.flow.SharedFlow
  */
 class BleMavConnection(
     private val deviceAddress: String
-) : MavConnection {
+) : RawConnection {
 
-    private val _mavFrame = MutableSharedFlow<MavFrame<out MavMessage<*>>>(replay = 0, extraBufferCapacity = 64)
-    override val mavFrame: SharedFlow<MavFrame<out MavMessage<*>>> = _mavFrame
+    private val _incomingBytes = MutableSharedFlow<ByteArray>(replay = 0, extraBufferCapacity = 64)
+    override val incomingBytes: SharedFlow<ByteArray> = _incomingBytes
 
     override suspend fun connect(readerScope: CoroutineScope) {
         throw NotImplementedError(
@@ -42,7 +40,7 @@ class BleMavConnection(
         )
     }
 
-    override suspend fun <T : MavMessage<T>> sendV1(systemId: UByte, componentId: UByte, payload: T) {
+    override suspend fun send(data: ByteArray) {
         throw NotImplementedError("BLE connection not yet implemented")
     }
 

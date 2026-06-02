@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import dev.uavonmap.app.connection.ConnectionProtocol
+import dev.uavonmap.app.connection.TelemetryProtocol
 import dev.uavonmap.app.databinding.ActivityMainBinding
 import dev.uavonmap.app.service.MockLocationService
 
@@ -28,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private var service: MockLocationService? = null
     private var bound = false
     private var selectedProtocol: ConnectionProtocol = ConnectionProtocol.TCP
+    private var selectedTelemProtocol: TelemetryProtocol = TelemetryProtocol.MAVLINK2
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -82,7 +84,24 @@ class MainActivity : AppCompatActivity() {
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
-        
+
+        // Setup telemetry protocol spinner
+        val telemAdapter = ArrayAdapter.createFromResource(
+            this, R.array.telemetry_protocols, android.R.layout.simple_spinner_item
+        ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        binding.spinnerTelemProtocol.adapter = telemAdapter
+
+        val savedTelemOrdinal = prefs.getInt("telem_protocol", TelemetryProtocol.MAVLINK2.ordinal)
+        selectedTelemProtocol = TelemetryProtocol.fromOrdinal(savedTelemOrdinal)
+        binding.spinnerTelemProtocol.setSelection(selectedTelemProtocol.ordinal)
+
+        binding.spinnerTelemProtocol.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                selectedTelemProtocol = TelemetryProtocol.fromOrdinal(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
         updateUIForProtocol()
 
         binding.btnConnect.setOnClickListener { requestPermissionsAndConnect() }
@@ -102,13 +121,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsAndConnect() {
-        // Check if protocol is implemented
+        // Check if transport is implemented
         if (!selectedProtocol.isImplemented) {
-            Toast.makeText(
-                this,
-                "${selectedProtocol.displayName} is not yet implemented. Coming soon!",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(this, "${selectedProtocol.displayName} transport not yet implemented", Toast.LENGTH_SHORT).show()
+            return
+        }
+        // Check if telemetry protocol is implemented
+        if (!selectedTelemProtocol.isImplemented) {
+            Toast.makeText(this, "${selectedTelemProtocol.displayName} protocol not yet implemented", Toast.LENGTH_SHORT).show()
             return
         }
         
@@ -135,12 +155,14 @@ class MainActivity : AppCompatActivity() {
             .putString("host", host)
             .putInt("port", port)
             .putInt("protocol", selectedProtocol.ordinal)
+            .putInt("telem_protocol", selectedTelemProtocol.ordinal)
             .apply()
 
         val intent = Intent(this, MockLocationService::class.java).apply {
             putExtra(MockLocationService.EXTRA_HOST, host)
             putExtra(MockLocationService.EXTRA_PORT, port)
             putExtra(MockLocationService.EXTRA_PROTOCOL, selectedProtocol.ordinal)
+            putExtra(MockLocationService.EXTRA_TELEM_PROTOCOL, selectedTelemProtocol.ordinal)
         }
         ContextCompat.startForegroundService(this, intent)
         bindService(intent, connection, Context.BIND_AUTO_CREATE)
@@ -148,6 +170,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnConnect.isEnabled    = false
         binding.btnDisconnect.isEnabled = true
         binding.spinnerProtocol.isEnabled = false
+        binding.spinnerTelemProtocol.isEnabled = false
         binding.editHost.isEnabled      = false
         binding.editPort.isEnabled      = false
         updateStatus("Connecting…")
@@ -158,6 +181,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnConnect.isEnabled    = true
         binding.btnDisconnect.isEnabled = false
         binding.spinnerProtocol.isEnabled = true
+        binding.spinnerTelemProtocol.isEnabled = true
         binding.editHost.isEnabled      = true
         binding.editPort.isEnabled      = true
         updateUIForProtocol()

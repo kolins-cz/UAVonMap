@@ -43,6 +43,20 @@
                 android:layout_marginBottom="16dp"
                 android:minHeight="48dp" />
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/telem_protocol_label"
+                android:textAppearance="?attr/textAppearanceBody2"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/spinnerTelemProtocol"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:minHeight="48dp" />
+
             <LinearLayout
                 android:id="@+id/layoutNetworkConfig"
                 android:layout_width="match_parent"
